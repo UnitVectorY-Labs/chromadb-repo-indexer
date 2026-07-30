@@ -16,7 +16,7 @@ dependencies = [
   "chromadb==1.5.9",
   "httpx==0.28.1",
   "llama-index-core==0.14.23",
-  "pathspec==0.12.1",
+  "pathspec==1.1.1",
   "PyYAML==6.0.3",
   "tree-sitter-language-pack==1.13.2",
 ]
