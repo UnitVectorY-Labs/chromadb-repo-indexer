@@ -22,6 +22,9 @@ DEFAULTS: dict[str, Any] = {
     "chunk_overlap": 64,
     "batch_size": 100,
     "retry_attempts": 3,
+    "embedding_api_url": "",
+    "embedding_model": "",
+    "embedding_api_key": "",
 }
 ENV_MAP = {
     "server_url": "CHROMA_REPO_INDEXER_SERVER_URL",
@@ -29,13 +32,17 @@ ENV_MAP = {
     "bearer_token": "CHROMA_REPO_INDEXER_BEARER_TOKEN",
     "tenant": "CHROMA_REPO_INDEXER_TENANT",
     "database": "CHROMA_REPO_INDEXER_DATABASE",
+    "embedding_api_url": "CHROMA_REPO_INDEXER_EMBEDDING_API_URL",
+    "embedding_model": "CHROMA_REPO_INDEXER_EMBEDDING_MODEL",
+    "embedding_api_key": "CHROMA_REPO_INDEXER_EMBEDDING_API_KEY",
 }
-ROOT_KEYS = {"version", "chroma", "files", "chunking", "sync"}
+ROOT_KEYS = {"version", "chroma", "files", "chunking", "sync", "embedding"}
 SECTION_KEYS = {
     "chroma": {"server_url", "collection_name", "tenant", "database"},
     "files": {"include_paths", "exclude_paths", "include_extensions", "exclude_extensions"},
     "chunking": {"chunk_size", "chunk_overlap"},
     "sync": {"batch_size", "retry_attempts"},
+    "embedding": {"api_url", "model", "api_key"},
 }
 
 
@@ -86,6 +93,13 @@ def _flatten_config(raw: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for section in ("chroma", "files", "chunking", "sync"):
         result.update(raw.get(section, {}))
+    emb = raw.get("embedding", {})
+    if emb.get("api_url"):
+        result["embedding_api_url"] = emb["api_url"]
+    if emb.get("model"):
+        result["embedding_model"] = emb["model"]
+    if emb.get("api_key"):
+        result["embedding_api_key"] = emb["api_key"]
     return result
 
 
@@ -127,6 +141,9 @@ def resolve_settings(
             raise ConfigurationError(f"{name} must be a list")
         values[name] = normalize_extensions(raw)
     values.setdefault("bearer_token", "")
+    values.setdefault("embedding_api_url", "")
+    values.setdefault("embedding_model", "")
+    values.setdefault("embedding_api_key", "")
     validate_settings(values)
     allowed = set(Settings.__dataclass_fields__)
     return Settings(**{key: value for key, value in values.items() if key in allowed})

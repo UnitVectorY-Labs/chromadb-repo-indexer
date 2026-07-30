@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 import chromadb
 import httpx
+from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 from chromadb.errors import NotFoundError
 
 from .errors import ChromaError
@@ -16,9 +17,36 @@ from .models import Record, Settings
 T = TypeVar("T")
 
 
+class OpenAICompatEmbeddingFunction(EmbeddingFunction[Documents]):
+    def __init__(self, api_url: str, model: str, api_key: str = "") -> None:
+        self.api_url = api_url.rstrip("/")
+        self.model = model
+        self.api_key = api_key
+
+    def __call__(self, input: Documents) -> Embeddings:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        prefixed = [f"passage: {doc}" if not doc.startswith(("passage: ", "query: ")) else doc for doc in input]
+        resp = httpx.post(
+            f"{self.api_url}/v1/embeddings",
+            json={"model": self.model, "input": prefixed},
+            headers=headers,
+            timeout=120,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        data = body.get("data", body) if isinstance(body, dict) else body
+        if isinstance(data, list):
+            return [item["embedding"] for item in sorted(data, key=lambda x: x.get("index", 0))]
+        if isinstance(data, dict):
+            return [data["embedding"]]
+        raise ValueError(f"unexpected embedding response: {body}")
+
+
 def _safe_error(exc: Exception, settings: Settings) -> str:
     message = str(exc)
-    for secret in (settings.bearer_token,):
+    for secret in (settings.bearer_token, settings.embedding_api_key):
         if secret:
             message = message.replace(secret, "<redacted>")
     return message[:1000]
@@ -79,6 +107,13 @@ class ChromaRepository:
                 sleep(min(8.0, 0.5 * (2 ** (attempt - 1))) + random.uniform(0, 0.25))
         self.collection: Any = None
         self._collection_missing = False
+        self._embedding_function = None
+        if settings.embedding_api_url and settings.embedding_model:
+            self._embedding_function = OpenAICompatEmbeddingFunction(
+                api_url=settings.embedding_api_url,
+                model=settings.embedding_model,
+                api_key=settings.embedding_api_key,
+            )
 
     def _call(self, operation: str, function: Callable[[], T]) -> T:
         attempts = self.settings.retry_attempts
@@ -93,11 +128,12 @@ class ChromaRepository:
 
     def connect(self) -> None:
         self._call("heartbeat", self.client.heartbeat)
+        ef = self._embedding_function
         if self.settings.dry_run:
             try:
                 self.collection = self.client.get_collection(
                     name=self.settings.collection_name,
-                    embedding_function=None,
+                    embedding_function=ef,
                 )
                 return
             except NotFoundError:
@@ -109,7 +145,7 @@ class ChromaRepository:
                     "collection lookup",
                     lambda: self.client.get_collection(
                         name=self.settings.collection_name,
-                        embedding_function=None,
+                        embedding_function=ef,
                     ),
                 )
                 return
@@ -117,7 +153,7 @@ class ChromaRepository:
             "collection lookup",
             lambda: self.client.get_or_create_collection(
                 name=self.settings.collection_name,
-                embedding_function=None,
+                embedding_function=ef,
             ),
         )
 

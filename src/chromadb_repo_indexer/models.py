@@ -35,6 +35,9 @@ class Settings:
     dry_run: bool = False
     output_manifest: Path | None = None
     include_document_text_in_manifest: bool = False
+    embedding_api_url: str = ""
+    embedding_model: str = ""
+    embedding_api_key: str = ""
 
 
 @dataclass(frozen=True)

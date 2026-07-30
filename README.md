@@ -2,7 +2,7 @@
 
 `chromadb-repo-indexer` is a Docker GitHub Action and Python CLI that keeps the text content of a repository directory synchronized with a remote ChromaDB collection. It discovers files without consulting Git, creates deterministic Markdown- and code-aware chunks, and safely converges one organization/repository/branch namespace without touching any other namespace in the collection.
 
-The indexer sends documents and metadata without explicitly supplying embeddings. The collection's configured embedding function must be able to embed documents.
+By default, the indexer sends documents and metadata without explicitly supplying embeddings, relying on the collection's configured embedding function. Optionally, an OpenAI-compatible embedding API can be provided so the indexer generates embeddings client-side.
 
 ## GitHub Action
 
@@ -57,6 +57,9 @@ The Action runs the public multi-architecture image at `ghcr.io/unitvectory-labs
 | `chunk-overlap` | no | `64` | Overlap when subdividing an oversized unit |
 | `batch-size` | no | `100` | Requested mutation batch size |
 | `dry-run` | no | `false` | Calculate the remote diff without mutations |
+| `embedding-api-url` | no | empty | OpenAI-compatible embeddings API origin |
+| `embedding-model` | no | empty | Model name for the embeddings API |
+| `embedding-api-key` | no | empty | API key sent as `Authorization: Bearer …` for embeddings |
 
 ### Outputs
 
@@ -97,6 +100,9 @@ Manual identity is mandatory and is never inferred from Git, YAML, or environmen
 --dry-run
 --output-manifest PATH
 --include-document-text-in-manifest
+--embedding-api-url URL
+--embedding-model MODEL
+--embedding-api-key KEY
 ```
 
 The last flag is deliberately separate because repository content may be sensitive. Manifests omit document text by default and contain deterministic IDs, metadata, hashes, and line boundaries.
@@ -110,6 +116,9 @@ CHROMA_REPO_INDEXER_BEARER_TOKEN
 CHROMA_REPO_INDEXER_TENANT
 CHROMA_REPO_INDEXER_DATABASE
 CHROMA_REPO_INDEXER_CONFIG_FILE
+CHROMA_REPO_INDEXER_EMBEDDING_API_URL
+CHROMA_REPO_INDEXER_EMBEDDING_MODEL
+CHROMA_REPO_INDEXER_EMBEDDING_API_KEY
 ```
 
 ## Configuration
@@ -142,6 +151,11 @@ chunking:
 sync:
   batch_size: 100
   retry_attempts: 3
+
+embedding:
+  api_url: https://embeddings.example.com
+  model: text-embedding-3-small
+  api_key: ""
 ```
 
 Traversal includes hidden files and does not apply `.gitignore`. `.git/**` is always excluded. Symlinks are not followed. Include/exclude paths use `pathspec` Git-wildmatch semantics; path matching is case-sensitive, while extension matching is case-insensitive. Exclusions win.
@@ -197,7 +211,7 @@ The requested batch size is reduced when Chroma advertises a smaller maximum. Tr
 
 ## Troubleshooting
 
-- **Collection cannot embed documents:** configure an embedding function on the target Chroma collection. The indexer intentionally does not accept or generate embeddings.
+- **Collection cannot embed documents:** configure an embedding function on the target Chroma collection, or provide an OpenAI-compatible embedding API via `--embedding-api-url` and `--embedding-model`.
 - **Unauthorized/forbidden:** verify the bearer token, tenant, and database. Tokens and authorization headers are redacted from errors and never written to manifests or outputs.
 - **No matching files:** remember that path patterns are Git-wildmatch and case-sensitive. Use `--dry-run --output-manifest manifest.json` to inspect the desired state.
 - **Code uses generic chunks:** malformed source, an unavailable grammar, or a parser error intentionally falls back rather than failing the run.

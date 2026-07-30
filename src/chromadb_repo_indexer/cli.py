@@ -39,6 +39,9 @@ def _parser() -> argparse.ArgumentParser:
     index.add_argument("--dry-run", action="store_true", default=None)
     index.add_argument("--output-manifest", type=Path)
     index.add_argument("--include-document-text-in-manifest", action="store_true", default=None)
+    index.add_argument("--embedding-api-url")
+    index.add_argument("--embedding-model")
+    index.add_argument("--embedding-api-key")
     return parser
 
 
