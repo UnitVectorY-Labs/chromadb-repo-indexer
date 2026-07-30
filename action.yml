@@ -1,0 +1,78 @@
+name: ChromaDB Repository Indexer
+description: Synchronize repository text into a remote ChromaDB collection
+author: UnitVectorY Labs
+inputs:
+  server-url:
+    description: Full HTTP(S) Chroma server URL
+    required: true
+  collection-name:
+    description: Shared Chroma collection name
+    required: true
+  bearer-token:
+    description: Optional static bearer token
+    required: false
+    default: ""
+  tenant:
+    description: Existing Chroma tenant
+    required: false
+    default: default_tenant
+  database:
+    description: Existing Chroma database
+    required: false
+    default: default_database
+  config-file:
+    description: Root-relative YAML configuration file
+    required: false
+    default: ""
+  include-paths:
+    description: Newline-separated Git wildmatch include patterns
+    required: false
+    default: ""
+  exclude-paths:
+    description: Newline-separated Git wildmatch exclude patterns
+    required: false
+    default: ""
+  include-extensions:
+    description: Newline-separated extension allowlist
+    required: false
+    default: ""
+  exclude-extensions:
+    description: Newline-separated extension denylist
+    required: false
+    default: ""
+  chunk-size:
+    description: Maximum tokens per chunk including context prefix
+    required: false
+    default: "512"
+  chunk-overlap:
+    description: Overlap tokens when subdividing an oversized unit
+    required: false
+    default: "64"
+  batch-size:
+    description: Requested Chroma mutation batch size
+    required: false
+    default: "100"
+  dry-run:
+    description: Plan changes without mutating Chroma
+    required: false
+    default: "false"
+outputs:
+  namespace_id: { description: Deterministic namespace hash }
+  files_scanned: { description: Regular files inspected }
+  files_eligible: { description: Files selected by filters }
+  files_indexed: { description: Non-empty text files indexed }
+  files_binary_skipped: { description: Binary or undecodable files skipped }
+  files_other_skipped: { description: Symlinks and non-regular entries skipped }
+  chunks_desired: { description: Desired record count }
+  chunks_added_or_updated: { description: Added or updated record count }
+  chunks_unchanged: { description: Unchanged record count }
+  chunks_deleted: { description: Deleted stale record count }
+  dry_run: { description: Whether mutations were disabled }
+  duration_ms: { description: Run duration in milliseconds }
+  summary: { description: Complete JSON run summary }
+runs:
+  using: docker
+  image: docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1
+branding:
+  icon: database
+  color: purple
