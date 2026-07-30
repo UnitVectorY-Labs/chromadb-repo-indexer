@@ -12,7 +12,7 @@ license = { file = "LICENSE" }
 authors = [{ name = "UnitVectorY Labs" }]
 dependencies = [
   "binaryornot==0.6.0",
-  "charset-normalizer==3.4.3",
+  "charset-normalizer==3.4.9",
   "chromadb==1.5.9",
   "httpx==0.28.1",
   "llama-index-core==0.14.23",
