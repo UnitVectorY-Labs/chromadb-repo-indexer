@@ -13,7 +13,10 @@ from .sync import synchronize
 
 
 def _input(name: str) -> str | None:
-    value = os.environ.get("INPUT_" + name.upper())
+    key = name.upper()
+    value = os.environ.get("INPUT_" + key)
+    if value is None:
+        value = os.environ.get("INPUT_" + key.replace("-", "_"))
     return value if value not in (None, "") else None
 
 

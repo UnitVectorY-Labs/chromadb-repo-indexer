@@ -69,22 +69,103 @@ inputs:
     required: false
     default: ""
 outputs:
-  namespace_id: { description: Deterministic namespace hash }
-  files_scanned: { description: Regular files inspected }
-  files_eligible: { description: Files selected by filters }
-  files_indexed: { description: Non-empty text files indexed }
-  files_binary_skipped: { description: Binary or undecodable files skipped }
-  files_other_skipped: { description: Symlinks and non-regular entries skipped }
-  chunks_desired: { description: Desired record count }
-  chunks_added_or_updated: { description: Added or updated record count }
-  chunks_unchanged: { description: Unchanged record count }
-  chunks_deleted: { description: Deleted stale record count }
-  dry_run: { description: Whether mutations were disabled }
-  duration_ms: { description: Run duration in milliseconds }
-  summary: { description: Complete JSON run summary }
+  namespace_id:
+    description: Deterministic namespace hash
+    value: ${{ steps.index.outputs.namespace_id }}
+  files_scanned:
+    description: Regular files inspected
+    value: ${{ steps.index.outputs.files_scanned }}
+  files_eligible:
+    description: Files selected by filters
+    value: ${{ steps.index.outputs.files_eligible }}
+  files_indexed:
+    description: Non-empty text files indexed
+    value: ${{ steps.index.outputs.files_indexed }}
+  files_binary_skipped:
+    description: Binary or undecodable files skipped
+    value: ${{ steps.index.outputs.files_binary_skipped }}
+  files_other_skipped:
+    description: Symlinks and non-regular entries skipped
+    value: ${{ steps.index.outputs.files_other_skipped }}
+  chunks_desired:
+    description: Desired record count
+    value: ${{ steps.index.outputs.chunks_desired }}
+  chunks_added_or_updated:
+    description: Added or updated record count
+    value: ${{ steps.index.outputs.chunks_added_or_updated }}
+  chunks_unchanged:
+    description: Unchanged record count
+    value: ${{ steps.index.outputs.chunks_unchanged }}
+  chunks_deleted:
+    description: Deleted stale record count
+    value: ${{ steps.index.outputs.chunks_deleted }}
+  dry_run:
+    description: Whether mutations were disabled
+    value: ${{ steps.index.outputs.dry_run }}
+  duration_ms:
+    description: Run duration in milliseconds
+    value: ${{ steps.index.outputs.duration_ms }}
+  summary:
+    description: Complete JSON run summary
+    value: ${{ steps.index.outputs.summary }}
 runs:
-  using: docker
-  image: docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1.0.0
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      with:
+        version: "0.11.32"
+        working-directory: ${{ github.action_path }}
+        enable-cache: "true"
+        cache-python: "true"
+        cache-suffix: chromadb-repo-indexer-v1
+        ignore-nothing-to-cache: "true"
+
+    - name: Install Python
+      shell: bash
+      run: uv python install 3.14
+
+    - name: Install indexer dependencies
+      shell: bash
+      run: uv sync --project "${GITHUB_ACTION_PATH}" --frozen --no-dev --no-editable
+
+    - name: Restore Tree-sitter grammars
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ~/.cache/tree-sitter-language-pack
+        key: tree-sitter-language-pack-1.13.4-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Install Tree-sitter grammars
+      shell: bash
+      run: >-
+        uv run --project "${GITHUB_ACTION_PATH}" --frozen --no-sync python -c
+        "from tree_sitter_language_pack import prefetch;
+        prefetch(['bash','c','cpp','csharp','css','go','html','java','javascript','json','kotlin','lua','php','python','ruby','rust','sql','swift','toml','tsx','typescript','vue','xml','yaml'])"
+
+    - name: Index repository
+      id: index
+      shell: bash
+      env:
+        INPUT_SERVER_URL: ${{ inputs.server-url }}
+        INPUT_COLLECTION_NAME: ${{ inputs.collection-name }}
+        INPUT_BEARER_TOKEN: ${{ inputs.bearer-token }}
+        INPUT_TENANT: ${{ inputs.tenant }}
+        INPUT_DATABASE: ${{ inputs.database }}
+        INPUT_CONFIG_FILE: ${{ inputs.config-file }}
+        INPUT_INCLUDE_PATHS: ${{ inputs.include-paths }}
+        INPUT_EXCLUDE_PATHS: ${{ inputs.exclude-paths }}
+        INPUT_INCLUDE_EXTENSIONS: ${{ inputs.include-extensions }}
+        INPUT_EXCLUDE_EXTENSIONS: ${{ inputs.exclude-extensions }}
+        INPUT_CHUNK_SIZE: ${{ inputs.chunk-size }}
+        INPUT_CHUNK_OVERLAP: ${{ inputs.chunk-overlap }}
+        INPUT_BATCH_SIZE: ${{ inputs.batch-size }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        INPUT_EMBEDDING_API_URL: ${{ inputs.embedding-api-url }}
+        INPUT_EMBEDDING_MODEL: ${{ inputs.embedding-model }}
+        INPUT_EMBEDDING_API_KEY: ${{ inputs.embedding-api-key }}
+      run: >-
+        uv run --project "${GITHUB_ACTION_PATH}" --frozen --no-sync
+        python -m chromadb_repo_indexer.action
 branding:
   icon: database
   color: purple

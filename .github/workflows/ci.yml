@@ -25,9 +25,61 @@ jobs:
       - run: uv run pytest --cov=chromadb_repo_indexer --cov-report=term-missing
 
   action:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: docker build -t chromadb-repo-indexer:test .
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.32"
+      - run: uv python install 3.14
+      - run: uv sync --frozen --no-dev --no-editable
+      - run: uv run --frozen --no-sync python -c "import chromadb_repo_indexer; print(chromadb_repo_indexer.__version__)"
+      - name: Start test Chroma server
+        id: chroma
+        shell: bash
+        run: |
+          CHROMA_TEST_DIR=$(mktemp -d)
+          uv run --frozen --no-sync chroma run \
+            --path "${CHROMA_TEST_DIR}" \
+            --host 127.0.0.1 \
+            --port 8765 \
+            >"${CHROMA_TEST_DIR}/server.log" 2>&1 &
+          echo "pid=$!" >> "${GITHUB_OUTPUT}"
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8765/api/v2/heartbeat >/dev/null; then
+              uv run --frozen --no-sync python -c \
+                "import chromadb; chromadb.HttpClient(host='127.0.0.1', port=8765).get_or_create_collection('ci-action-test')"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${CHROMA_TEST_DIR}/server.log"
+          exit 1
+      - name: Run composite Action
+        id: index
+        uses: ./
+        with:
+          server-url: http://127.0.0.1:8765
+          collection-name: ci-action-test
+          include-paths: README.md
+          dry-run: "true"
+      - name: Verify Action outputs
+        shell: bash
+        env:
+          SUMMARY: ${{ steps.index.outputs.summary }}
+        run: test -n "${SUMMARY}"
+      - name: Stop test Chroma server
+        if: ${{ always() }}
+        shell: bash
+        env:
+          CHROMA_PID: ${{ steps.chroma.outputs.pid }}
+        run: |
+          if [ -n "${CHROMA_PID}" ]; then
+            kill "${CHROMA_PID}" 2>/dev/null || true
+          fi

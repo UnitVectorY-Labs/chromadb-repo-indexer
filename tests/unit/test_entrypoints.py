@@ -53,12 +53,12 @@ def test_action_uses_only_github_identity_and_writes_outputs(tmp_path: Path, mon
         "GITHUB_REF_NAME": "main",
         "GITHUB_SHA": "deadbeef",
         "GITHUB_OUTPUT": str(output),
-        "INPUT_SERVER-URL": "https://example.test",
-        "INPUT_COLLECTION-NAME": "test-collection",
-        "INPUT_DRY-RUN": "true",
-        "INPUT_EMBEDDING-API-URL": "https://embeddings.example.test",
-        "INPUT_EMBEDDING-MODEL": "example-model",
-        "INPUT_EMBEDDING-API-KEY": "example-key",
+        "INPUT_SERVER_URL": "https://example.test",
+        "INPUT_COLLECTION_NAME": "test-collection",
+        "INPUT_DRY_RUN": "true",
+        "INPUT_EMBEDDING_API_URL": "https://embeddings.example.test",
+        "INPUT_EMBEDDING_MODEL": "example-model",
+        "INPUT_EMBEDDING_API_KEY": "example-key",
     }
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -92,10 +92,10 @@ def test_action_rejects_missing_context_before_sync(tmp_path: Path, monkeypatch)
 
 def test_action_metadata_is_valid() -> None:
     metadata = yaml.safe_load(Path("action.yml").read_text())
-    assert metadata["runs"] == {
-        "using": "docker",
-        "image": "docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1.0.0",
-    }
+    assert metadata["runs"]["using"] == "composite"
+    assert metadata["runs"]["steps"][-1]["id"] == "index"
+    assert metadata["runs"]["steps"][-1]["env"]["INPUT_SERVER_URL"] == "${{ inputs.server-url }}"
+    assert metadata["outputs"]["summary"]["value"] == "${{ steps.index.outputs.summary }}"
     assert {
         "embedding-api-url",
         "embedding-model",

@@ -1,6 +1,6 @@
 # chromadb-repo-indexer
 
-`chromadb-repo-indexer` is a Docker GitHub Action and Python CLI that keeps the text content of a repository directory synchronized with a remote ChromaDB collection. It discovers files without consulting Git, creates deterministic Markdown- and code-aware chunks, and safely converges one organization/repository/branch namespace without touching any other namespace in the collection.
+`chromadb-repo-indexer` is a Python-based composite GitHub Action and Python CLI that keeps the text content of a repository directory synchronized with a remote ChromaDB collection. It discovers files without consulting Git, creates deterministic Markdown- and code-aware chunks, and safely converges one organization/repository/branch namespace without touching any other namespace in the collection.
 
 By default, the indexer sends documents and metadata without explicitly supplying embeddings, relying on the collection's configured embedding function. Optionally, an OpenAI-compatible embedding API can be provided so the indexer generates embeddings client-side.
 
@@ -37,7 +37,7 @@ jobs:
 
 The checkout step is required. Action identity is always derived from `GITHUB_REPOSITORY`, `GITHUB_REF_NAME`, and `GITHUB_SHA`; there are no identity override inputs. Consumers must serialize runs for the same collection/repository/branch namespace with a GitHub Actions concurrency group.
 
-The Action runs a public multi-architecture image from `ghcr.io/unitvectory-labs/chromadb-repo-indexer`. Consumers reference `UnitVectorY-Labs/chromadb-repo-indexer@v1`; the movable repository tag selects the latest compatible Action metadata, and each released metadata revision pins its exact GHCR image version.
+The Action uses `uv` to install a managed Python 3.14 runtime and the exact dependencies from `uv.lock`, then runs the indexer directly on the runner. Both Python downloads and dependency downloads are stored in the GitHub Actions cache, and Tree-sitter grammars use a separate versioned cache. No container runtime is required. Linux AMD64 and ARM64 runners are supported.
 
 ### Inputs
 
@@ -168,7 +168,7 @@ All decoded text has UTF-8 BOMs removed and line endings normalized to `\n`. Bin
 - Recognized source files use the pinned Tree-sitter language pack to prefer top-level declarations. A missing grammar or parse error falls back to generic splitting.
 - Other text recursively splits at blank lines, lines, whitespace, and finally bounded character spans.
 
-The current recognized code extensions cover Bash, C/C++, C#, CSS, Go, HTML, Java, JavaScript/JSX, JSON, Kotlin, Lua, PHP, Python, Ruby, Rust, SQL, Swift, TOML, TypeScript/TSX, Vue, XML, and YAML. The Docker image prefetches their pinned grammars during build. For local execution, the language pack may populate its user cache the first time a grammar is used; `CHROMA_REPO_INDEXER_TREE_SITTER_CACHE` can select a different cache directory.
+The current recognized code extensions cover Bash, C/C++, C#, CSS, Go, HTML, Java, JavaScript/JSX, JSON, Kotlin, Lua, PHP, Python, Ruby, Rust, SQL, Swift, TOML, TypeScript/TSX, Vue, XML, and YAML. The Action prefetches their pinned grammars and stores them in the GitHub Actions cache. For local execution, the language pack may populate its user cache the first time a grammar is used; `CHROMA_REPO_INDEXER_TREE_SITTER_CACHE` can select a different cache directory.
 
 Every Chroma document begins with a deterministic context prefix:
 
@@ -222,13 +222,12 @@ The requested batch size is reduced when Chroma advertises a smaller maximum. Tr
 ```bash
 uv sync --extra test
 uv run pytest --cov=chromadb_repo_indexer
-docker build -t chromadb-repo-indexer .
 ```
 
-Dependencies are exact-pinned in `pyproject.toml` and fully resolved in `uv.lock`. CI tests Python 3.13 and 3.14 and builds the Docker Action.
+Dependencies are exact-pinned in `pyproject.toml` and fully resolved in `uv.lock`. CI tests Python 3.13 and 3.14 and verifies the production installation on Linux AMD64 and ARM64 runners.
 
 ## Releases
 
-Publishing a GitHub Release with a semantic tag such as `v1.0.0` runs `.github/workflows/release-docker-ghcr.yml`. The workflow builds native `linux/amd64` and `linux/arm64` images, creates the multi-architecture manifest, publishes `v1.0.0`, `v1.0`, and `v1` tags to GHCR, attaches build-provenance attestations, and moves the repository's `v1.0` and `v1` Action tags to the released commit.
+Publishing a stable GitHub Release with a semantic tag such as `v1.0.0` runs `.github/workflows/release.yml`, which moves the repository's `v1.0` and `v1` Action tags to the released commit.
 
-The movable repository tag `v1` and GHCR image tag `v1` are the public major-version channel. The GHCR package must be public so GitHub can pull the container before executing the Action. PyPI publication, if added later, is independent and only affects installation of the local CLI.
+The movable repository tag `v1` is the public major-version channel. PyPI publication, if added later, is independent and only affects installation of the local CLI.
