@@ -15,6 +15,7 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 ARG VERSION=dev
-LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.source="https://github.com/UnitVectorY-Labs/chromadb-repo-indexer"
 
 ENTRYPOINT ["/app/.venv/bin/python", "-m", "chromadb_repo_indexer.action"]

@@ -37,7 +37,7 @@ jobs:
 
 The checkout step is required. Action identity is always derived from `GITHUB_REPOSITORY`, `GITHUB_REF_NAME`, and `GITHUB_SHA`; there are no identity override inputs. Consumers must serialize runs for the same collection/repository/branch namespace with a GitHub Actions concurrency group.
 
-The Action runs the public multi-architecture image at `ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1`. Consumers still reference `UnitVectorY-Labs/chromadb-repo-indexer@v1`; `action.yml` connects that Action release to the corresponding GHCR major-version image.
+The Action runs a public multi-architecture image from `ghcr.io/unitvectory-labs/chromadb-repo-indexer`. Consumers reference `UnitVectorY-Labs/chromadb-repo-indexer@v1`; the movable repository tag selects the latest compatible Action metadata, and each released metadata revision pins its exact GHCR image version.
 
 ### Inputs
 
@@ -229,6 +229,6 @@ Dependencies are exact-pinned in `pyproject.toml` and fully resolved in `uv.lock
 
 ## Releases
 
-Publishing a GitHub Release with a semantic tag such as `v1.0.0` runs `.github/workflows/release-docker-ghcr.yml`. The workflow builds native `linux/amd64` and `linux/arm64` images, creates the multi-architecture manifest, publishes `v1.0.0`, `v1.0`, and `v1` tags to GHCR, and attaches build-provenance attestations.
+Publishing a GitHub Release with a semantic tag such as `v1.0.0` runs `.github/workflows/release-docker-ghcr.yml`. The workflow builds native `linux/amd64` and `linux/arm64` images, creates the multi-architecture manifest, publishes `v1.0.0`, `v1.0`, and `v1` tags to GHCR, attaches build-provenance attestations, and moves the repository's `v1.0` and `v1` Action tags to the released commit.
 
 The movable repository tag `v1` and GHCR image tag `v1` are the public major-version channel. The GHCR package must be public so GitHub can pull the container before executing the Action. PyPI publication, if added later, is independent and only affects installation of the local CLI.

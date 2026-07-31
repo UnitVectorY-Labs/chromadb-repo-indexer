@@ -67,6 +67,9 @@ def run() -> int:
         "chunk_overlap": _integer("CHUNK-OVERLAP"),
         "batch_size": _integer("BATCH-SIZE"),
         "dry_run": _boolean("DRY-RUN"),
+        "embedding_api_url": _input("EMBEDDING-API-URL"),
+        "embedding_model": _input("EMBEDDING-MODEL"),
+        "embedding_api_key": _input("EMBEDDING-API-KEY"),
     }
     settings = resolve_settings(root=root, cli=cli, config_path=config_path)
     identity = Identity(parts[0], parts[1], ref_name, sha)

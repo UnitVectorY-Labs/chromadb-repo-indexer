@@ -56,6 +56,18 @@ inputs:
     description: Plan changes without mutating Chroma
     required: false
     default: "false"
+  embedding-api-url:
+    description: Optional OpenAI-compatible embeddings API origin
+    required: false
+    default: ""
+  embedding-model:
+    description: Optional model name for the embeddings API
+    required: false
+    default: ""
+  embedding-api-key:
+    description: Optional API key for the embeddings API
+    required: false
+    default: ""
 outputs:
   namespace_id: { description: Deterministic namespace hash }
   files_scanned: { description: Regular files inspected }
@@ -72,7 +84,7 @@ outputs:
   summary: { description: Complete JSON run summary }
 runs:
   using: docker
-  image: docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1
+  image: docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1.0.0
 branding:
   icon: database
   color: purple

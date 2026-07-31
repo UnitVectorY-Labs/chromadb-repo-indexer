@@ -56,6 +56,9 @@ def test_action_uses_only_github_identity_and_writes_outputs(tmp_path: Path, mon
         "INPUT_SERVER-URL": "https://example.test",
         "INPUT_COLLECTION-NAME": "test-collection",
         "INPUT_DRY-RUN": "true",
+        "INPUT_EMBEDDING-API-URL": "https://embeddings.example.test",
+        "INPUT_EMBEDDING-MODEL": "example-model",
+        "INPUT_EMBEDDING-API-KEY": "example-key",
     }
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -72,6 +75,9 @@ def test_action_uses_only_github_identity_and_writes_outputs(tmp_path: Path, mon
     assert captured["identity"].repository == "Project"
     assert captured["identity"].commit_sha == "deadbeef"
     assert captured["settings"].dry_run is True
+    assert captured["settings"].embedding_api_url == "https://embeddings.example.test"
+    assert captured["settings"].embedding_model == "example-model"
+    assert captured["settings"].embedding_api_key == "example-key"
     assert "chunks_desired=3" in output.read_text()
 
 
@@ -88,8 +94,13 @@ def test_action_metadata_is_valid() -> None:
     metadata = yaml.safe_load(Path("action.yml").read_text())
     assert metadata["runs"] == {
         "using": "docker",
-        "image": "docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1",
+        "image": "docker://ghcr.io/unitvectory-labs/chromadb-repo-indexer:v1.0.0",
     }
+    assert {
+        "embedding-api-url",
+        "embedding-model",
+        "embedding-api-key",
+    } <= metadata["inputs"].keys()
     assert "organization" not in metadata["inputs"]
     assert "repository" not in metadata["inputs"]
     assert "branch" not in metadata["inputs"]
