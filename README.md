@@ -164,8 +164,8 @@ Traversal includes hidden files and does not apply `.gitignore`. `.git/**` is al
 
 All decoded text has UTF-8 BOMs removed and line endings normalized to `\n`. Binary detection uses `binaryornot` plus a NUL check; UTF-8 is preferred and high-confidence `charset-normalizer` decoding is the fallback.
 
-- Markdown (`.md`, `.markdown`, `.mdown`, `.mkd`) splits by heading structure and repeats the complete heading path in each context prefix. Natural blocks are retained when they fit.
-- Recognized source files use the pinned Tree-sitter language pack to prefer top-level declarations. A missing grammar or parse error falls back to generic splitting.
+- Markdown (`.md`, `.markdown`, `.mdown`, `.mkd`) uses each heading section as the retrieval unit and repeats the complete heading path in each context prefix. Oversized sections split at natural block boundaries; small adjacent prose, tables, and fenced examples stay together.
+- Recognized source files use the pinned Tree-sitter language pack to isolate file preambles and prefer top-level declarations. A missing grammar or parse error falls back to generic splitting.
 - Other text recursively splits at blank lines, lines, whitespace, and finally bounded character spans.
 
 The current recognized code extensions cover Bash, C/C++, C#, CSS, Go, HTML, Java, JavaScript/JSX, JSON, Kotlin, Lua, PHP, Python, Ruby, Rust, SQL, Swift, TOML, TypeScript/TSX, Vue, XML, and YAML. The Action prefetches their pinned grammars and stores them in the GitHub Actions cache. For local execution, the language pack may populate its user cache the first time a grammar is used; `CHROMA_REPO_INDEXER_TREE_SITTER_CACHE` can select a different cache directory.
@@ -180,7 +180,7 @@ Section: Setup > Authentication
 <exact normalized source excerpt>
 ```
 
-The maximum token count includes this prefix. Independent structural units do not receive manufactured overlap; overlap is used only when an oversized unit needs subdivision. `chunking_version` is currently `1`.
+The maximum token count includes this prefix. Independent structural units do not receive manufactured overlap; overlap is used only when an oversized unit needs subdivision. `chunking_version` is currently `2`.
 
 ## Metadata and identity
 

@@ -50,6 +50,26 @@ def test_python_uses_structural_symbols(tmp_path: Path) -> None:
     assert "class Second" in records[1].document
 
 
+def test_code_keeps_preamble_separate_from_the_first_symbol(tmp_path: Path) -> None:
+    text = '"""Module documentation."""\n\nimport os\n\ndef first():\n    return os.name\n'
+    source = SourceFile(tmp_path / "module.py", "module.py", ".py")
+    identity = Identity("Org", "Repo", "main")
+    records = build_records(
+        identity,
+        namespace_id(identity),
+        source,
+        DecodedFile(text, "code", "python", "python"),
+        512,
+        64,
+    )
+
+    assert len(records) == 2
+    assert records[0].metadata["symbol"] == ""
+    assert "import os" in records[0].document
+    assert "first" in str(records[1].metadata["symbol"])
+    assert "def first" in records[1].document
+
+
 def test_file_hash_uses_normalized_full_text(tmp_path: Path) -> None:
     text = "hello\n"
     source = SourceFile(tmp_path / "note.txt", "note.txt", ".txt")
@@ -77,6 +97,32 @@ def test_markdown_keeps_fences_and_tables_intact_when_they_fit(tmp_path: Path) -
     table_records = [record for record in records if "| Name | Value |" in record.document]
     assert len(fence_records) == 1 and fence in fence_records[0].document
     assert len(table_records) == 1 and table in table_records[0].document
+
+
+def test_markdown_groups_small_blocks_in_one_heading_section(tmp_path: Path) -> None:
+    text = """# Usage
+
+**Global Flags**
+
+| Flag | Description |
+| --- | --- |
+| `--version`, `-v` | Print the version |
+| `--help`, `-h` | Show help |
+"""
+    source = SourceFile(tmp_path / "usage.md", "docs/USAGE.md", ".md")
+    identity = Identity("Org", "Repo", "main")
+    records = build_records(
+        identity,
+        namespace_id(identity),
+        source,
+        DecodedFile(text, "markdown", "markdown", ""),
+        chunk_size=512,
+        overlap=64,
+    )
+
+    assert len(records) == 1
+    assert "**Global Flags**" in records[0].document
+    assert "| `--version`, `-v` | Print the version |" in records[0].document
 
 
 def test_malformed_code_falls_back_without_failure(tmp_path: Path) -> None:

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-CHUNKING_VERSION = 1
+CHUNKING_VERSION = 2
 
 
 @dataclass(frozen=True)

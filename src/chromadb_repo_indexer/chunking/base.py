@@ -94,6 +94,43 @@ def chunks_from_spans(text: str, spans: list[Span]) -> list[Chunk]:
     return chunks
 
 
+def pack_markdown_blocks(
+    text: str,
+    spans: list[Span],
+    max_tokens: int,
+    counter: TokenCounter,
+    prefix_for: Callable[[str, str], str],
+) -> list[Span]:
+    """Greedily pack adjacent Markdown blocks from the same heading section.
+
+    Markdown blocks are useful split points for oversized sections, but are too
+    small to be retrieval units on their own.  Keep them atomic while packing
+    them to the configured content budget.  A small leading heading is allowed
+    to travel with an oversized first block so a split never strands the title.
+    """
+    packed: list[Span] = []
+    current: Span | None = None
+    for span in spans:
+        if current is None:
+            current = span
+            continue
+        same_context = (current.section, current.symbol) == (span.section, span.symbol)
+        prefix_tokens = counter.count(prefix_for(current.section, current.symbol))
+        budget = max_tokens - prefix_tokens
+        combined = Span(current.start, span.end, current.section, current.symbol)
+        fits = budget > 0 and counter.count(text[combined.start : combined.end]) <= budget
+        leading_heading = current.start < current.end and text[current.start : current.end].lstrip().startswith("#")
+        small_heading = counter.count(text[current.start : current.end]) <= 20
+        if same_context and (fits or (leading_heading and small_heading)):
+            current = combined
+            continue
+        packed.append(current)
+        current = span
+    if current is not None:
+        packed.append(current)
+    return packed
+
+
 def chunk_document(
     text: str,
     strategy: str,
@@ -109,6 +146,7 @@ def chunk_document(
         from .markdown import markdown_spans
 
         structural = markdown_spans(text)
+        structural = pack_markdown_blocks(text, structural, max_tokens, counter, prefix_for)
     elif strategy == "code":
         from .code import code_spans
 

@@ -8,6 +8,7 @@ HEADING = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$")
 
 
 def markdown_spans(text: str) -> list[Span]:
+    """Return atomic blocks annotated with their enclosing heading path."""
     lines = text.splitlines(keepends=True)
     positions: list[int] = []
     cursor = 0

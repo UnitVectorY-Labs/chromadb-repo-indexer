@@ -68,7 +68,9 @@ def code_spans(text: str, language: str) -> list[Span] | None:
     for index, node in enumerate(nodes):
         node_start = character_offset(node.start_byte)
         next_start = character_offset(nodes[index + 1].start_byte) if index + 1 < len(nodes) else len(text)
-        start = cursor
+        if cursor < node_start:
+            spans.append(Span(cursor, node_start))
+        start = node_start
         end = max(character_offset(node.end_byte), next_start)
         spans.append(Span(start, end, symbol=_symbol(node, source)))
         cursor = end
