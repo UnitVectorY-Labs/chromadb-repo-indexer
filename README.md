@@ -98,11 +98,24 @@ Manual identity is mandatory and is never inferred from Git, YAML, or environmen
 --batch-size N
 --retry-attempts N
 --dry-run
+--chunk-report
 --output-manifest PATH
 --include-document-text-in-manifest
 --embedding-api-url URL
 --embedding-model MODEL
 --embedding-api-key KEY
+```
+
+`--chunk-report` runs the same discovery and chunking pipeline and prints a JSON report of chunk statistics (totals, token sizes, per-file breakdown) to stdout without connecting to ChromaDB, embedding, or writing to the collection. It does not require `--server-url` or `--collection-name`. It reports exactly the files and chunks that a normal run would insert, so it is useful for debugging chunking behavior:
+
+```bash
+chromadb-repo-indexer index \
+  --root . \
+  --organization UnitVectorY-Labs \
+  --repository example \
+  --branch main \
+  --include-extension md \
+  --chunk-report
 ```
 
 The last flag is deliberately separate because repository content may be sensitive. Manifests omit document text by default and contain deterministic IDs, metadata, hashes, and line boundaries.

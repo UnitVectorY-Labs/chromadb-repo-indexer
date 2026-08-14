@@ -141,6 +141,8 @@ def resolve_settings(
             raise ConfigurationError(f"{name} must be a list")
         values[name] = normalize_extensions(raw)
     values.setdefault("bearer_token", "")
+    values.setdefault("server_url", "")
+    values.setdefault("collection_name", "")
     values.setdefault("embedding_api_url", "")
     values.setdefault("embedding_model", "")
     values.setdefault("embedding_api_key", "")
@@ -153,21 +155,22 @@ def validate_settings(values: Mapping[str, Any]) -> None:
     root = Path(values["root"])
     if not root.exists() or not root.is_dir():
         raise ConfigurationError(f"root is not an existing directory: {root}")
-    url = str(values.get("server_url", ""))
-    try:
-        parsed = urlsplit(url)
-        hostname = parsed.hostname
-        parsed.port
-    except ValueError as exc:
-        raise ConfigurationError("server_url is not a valid HTTP(S) origin") from exc
-    if parsed.scheme not in {"http", "https"} or not hostname or parsed.path not in ("", "/"):
-        raise ConfigurationError("server_url must be a full HTTP(S) origin without a path")
-    if parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise ConfigurationError("server_url may not contain credentials, query, or fragment")
-    collection_value = values.get("collection_name", "")
-    collection = collection_value if isinstance(collection_value, str) else ""
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{1,510}[A-Za-z0-9]", collection):
-        raise ConfigurationError("collection_name must be 3-512 characters and use letters, numbers, '.', '_' or '-'")
+    if not values.get("chunk_report"):
+        url = str(values.get("server_url", ""))
+        try:
+            parsed = urlsplit(url)
+            hostname = parsed.hostname
+            parsed.port
+        except ValueError as exc:
+            raise ConfigurationError("server_url is not a valid HTTP(S) origin") from exc
+        if parsed.scheme not in {"http", "https"} or not hostname or parsed.path not in ("", "/"):
+            raise ConfigurationError("server_url must be a full HTTP(S) origin without a path")
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ConfigurationError("server_url may not contain credentials, query, or fragment")
+        collection_value = values.get("collection_name", "")
+        collection = collection_value if isinstance(collection_value, str) else ""
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{1,510}[A-Za-z0-9]", collection):
+            raise ConfigurationError("collection_name must be 3-512 characters and use letters, numbers, '.', '_' or '-'")
     for name in ("tenant", "database"):
         if not isinstance(values[name], str) or not values[name].strip():
             raise ConfigurationError(f"{name} must be a non-empty string")

@@ -6,6 +6,7 @@ import logging
 import sys
 from pathlib import Path
 
+from .chunk_report import build_chunk_report
 from .config import resolve_settings
 from .errors import IndexerError
 from .models import Identity
@@ -37,6 +38,12 @@ def _parser() -> argparse.ArgumentParser:
     index.add_argument("--batch-size", type=int)
     index.add_argument("--retry-attempts", type=int)
     index.add_argument("--dry-run", action="store_true", default=None)
+    index.add_argument(
+        "--chunk-report",
+        action="store_true",
+        default=None,
+        help="print chunking statistics and exit without connecting to ChromaDB",
+    )
     index.add_argument("--output-manifest", type=Path)
     index.add_argument("--include-document-text-in-manifest", action="store_true", default=None)
     index.add_argument("--embedding-api-url")
@@ -59,6 +66,10 @@ def run(argv: list[str] | None = None) -> int:
     config = values.pop("config")
     values["output_manifest"] = values.get("output_manifest")
     settings = resolve_settings(root=root, cli=values, config_path=config)
+    if settings.chunk_report:
+        report = build_chunk_report(settings, identity)
+        print(json.dumps(report, sort_keys=True))
+        return 0
     summary, _ = synchronize(settings, identity)
     print(json.dumps(summary.as_dict(), sort_keys=True))
     return 0

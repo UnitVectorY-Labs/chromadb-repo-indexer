@@ -33,6 +33,7 @@ class Settings:
     batch_size: int = 100
     retry_attempts: int = 3
     dry_run: bool = False
+    chunk_report: bool = False
     output_manifest: Path | None = None
     include_document_text_in_manifest: bool = False
     embedding_api_url: str = ""
