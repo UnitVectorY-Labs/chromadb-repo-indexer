@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from chromadb_repo_indexer import cli
-from chromadb_repo_indexer.chunk_report import build_chunk_report
+from chromadb_repo_indexer.chunk_report import build_chunk_report, format_chunk_report
 from chromadb_repo_indexer.config import resolve_settings
 from chromadb_repo_indexer.errors import ConfigurationError
 from chromadb_repo_indexer.models import Identity, Settings
@@ -26,22 +26,21 @@ def write_repo(root: Path) -> None:
     (root / "notes.txt").write_text("not markdown\n", encoding="utf-8")
 
 
-def test_cli_chunk_report_prints_stats_without_chroma_config(tmp_path: Path, capsys) -> None:
+def test_cli_chunk_report_json_output(tmp_path: Path, capsys) -> None:
     write_repo(tmp_path)
     result = cli.run(
         [
-            "index",
-            "--root", str(tmp_path),
-            "--organization", "Org",
-            "--repository", "Repo",
-            "--branch", "main",
+            "chunk-report",
+            str(tmp_path),
             "--include-extension", "md",
-            "--chunk-report",
+            "--json",
         ]
     )
     assert result == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["report"] == "chunking"
+    assert payload["report_version"] == 3
+    assert payload["root"] == str(tmp_path)
     assert payload["chunk_size"] == 512
     assert payload["files"] == {
         "scanned": 3,
@@ -54,6 +53,28 @@ def test_cli_chunk_report_prints_stats_without_chroma_config(tmp_path: Path, cap
     assert payload["chunks"]["tokens"]["max"] <= 512
     assert payload["chunks"]["within_budget"]["pct"] == 100.0
     assert sum(payload["chunks"]["histogram_tokens"].values()) == payload["chunks"]["total"]
+    assert "files_detail" not in payload
+    by_extension = payload["by_extension"]
+    assert set(by_extension) == {".md"}
+    entry = by_extension[".md"]
+    assert entry["files"] == 2
+    assert entry["chunks"] == payload["chunks"]["total"]
+    assert entry["total_tokens"] >= entry["tokens"]["min"] * entry["chunks"]
+
+
+def test_cli_chunk_report_verbose_includes_file_detail(tmp_path: Path, capsys) -> None:
+    write_repo(tmp_path)
+    result = cli.run(
+        [
+            "chunk-report",
+            str(tmp_path),
+            "--include-extension", "md",
+            "--json",
+            "--verbose",
+        ]
+    )
+    assert result == 0
+    payload = json.loads(capsys.readouterr().out)
     paths = [entry["path"] for entry in payload["files_detail"]]
     assert paths == ["README.md", "docs/guide.md"]
     readme = payload["files_detail"][0]
@@ -62,7 +83,7 @@ def test_cli_chunk_report_prints_stats_without_chroma_config(tmp_path: Path, cap
     assert readme["total_tokens"] >= readme["tokens"]["min"] * readme["chunks"]
 
 
-def test_index_without_flag_still_requires_chroma_config(tmp_path: Path) -> None:
+def test_index_requires_chroma_config(tmp_path: Path) -> None:
     write_repo(tmp_path)
     with pytest.raises(ConfigurationError, match="server_url"):
         cli.run(
@@ -83,11 +104,12 @@ def test_build_chunk_report_honors_chunk_size(tmp_path: Path) -> None:
         cli={"include_extensions": ["md"], "chunk_size": 128, "chunk_overlap": 16, "chunk_report": True},
         environ={},
     )
-    report = build_chunk_report(settings, Identity("Org", "Repo", "main"))
+    report = build_chunk_report(settings, verbose=True)
     assert report["chunk_size"] == 128
     assert report["chunks"]["tokens"]["max"] <= 128
     assert report["files"]["indexed"] == 2
     assert report["chunks"]["total"] == sum(entry["chunks"] for entry in report["files_detail"])
+    assert report["chunks"]["total"] == sum(data["chunks"] for data in report["by_extension"].values())
     assert report["chunks"]["tokens"]["min"] >= 1
 
 
@@ -128,7 +150,7 @@ def test_report_matches_the_records_sync_would_insert(tmp_path: Path) -> None:
 
     repository = FakeRepository(settings)
     summary, _ = synchronize(settings, identity, repository_factory=lambda s: repository)
-    report = build_chunk_report(settings, identity)
+    report = build_chunk_report(settings, verbose=True)
     sync_counts = Counter(record.metadata["path"] for record in repository.upserted)
     report_counts = {entry["path"]: entry["chunks"] for entry in report["files_detail"]}
     assert set(sync_counts) == set(report_counts)
@@ -139,7 +161,7 @@ def test_report_matches_the_records_sync_would_insert(tmp_path: Path) -> None:
 def test_build_chunk_report_single_chunk_has_no_percentiles(tmp_path: Path) -> None:
     (tmp_path / "one.md").write_text("# Only\n\nOne small block.\n", encoding="utf-8")
     settings = Settings(root=tmp_path, server_url="", collection_name="", chunk_report=True)
-    report = build_chunk_report(settings, Identity("Org", "Repo", "main"))
+    report = build_chunk_report(settings)
     assert report["chunks"]["total"] == 1
     tokens = report["chunks"]["tokens"]
     assert tokens["min"] == tokens["max"] == tokens["mean"] == tokens["median"]
@@ -149,9 +171,36 @@ def test_build_chunk_report_single_chunk_has_no_percentiles(tmp_path: Path) -> N
 
 def test_build_chunk_report_empty_repo(tmp_path: Path) -> None:
     settings = Settings(root=tmp_path, server_url="", collection_name="", chunk_report=True)
-    report = build_chunk_report(settings, Identity("Org", "Repo", "main"))
+    report = build_chunk_report(settings, verbose=True)
     assert report["chunks"]["total"] == 0
     assert report["files"]["indexed"] == 0
     assert report["files_detail"] == []
+    assert report["by_extension"] == {}
     assert report["chunks"]["tokens"] == {"min": 0, "max": 0, "mean": 0.0, "median": 0.0}
     assert report["chunks"]["within_budget"]["pct"] == 0.0
+
+
+def test_format_chunk_report_empty_repo(tmp_path: Path) -> None:
+    settings = Settings(root=tmp_path, server_url="", collection_name="")
+    report = build_chunk_report(settings)
+    text = format_chunk_report(report)
+    assert f"Chunk report: {tmp_path}" in text
+    assert "total           0" in text
+    assert "By extension" not in text
+    assert "Files detail" not in text
+
+
+def test_cli_chunk_report_default_text_output(tmp_path: Path, capsys) -> None:
+    write_repo(tmp_path)
+    result = cli.run(["chunk-report", str(tmp_path), "--include-extension", "md"])
+    assert result == 0
+    out = capsys.readouterr().out
+    assert out.startswith(f"Chunk report: {tmp_path}")
+    assert "Files" in out
+    assert "Chunks" in out
+    assert "By extension" in out
+    assert ".md" in out
+    assert "Files detail" not in out
+    assert "README.md" not in out
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(out)

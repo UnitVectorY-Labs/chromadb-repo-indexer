@@ -98,7 +98,6 @@ Manual identity is mandatory and is never inferred from Git, YAML, or environmen
 --batch-size N
 --retry-attempts N
 --dry-run
---chunk-report
 --output-manifest PATH
 --include-document-text-in-manifest
 --embedding-api-url URL
@@ -106,17 +105,28 @@ Manual identity is mandatory and is never inferred from Git, YAML, or environmen
 --embedding-api-key KEY
 ```
 
-`--chunk-report` runs the same discovery and chunking pipeline and prints a JSON report of chunk statistics (totals, token sizes, per-file breakdown) to stdout without connecting to ChromaDB, embedding, or writing to the collection. It does not require `--server-url` or `--collection-name`. It reports exactly the files and chunks that a normal run would insert, so it is useful for debugging chunking behavior:
+### Chunk report
+
+`chunk-report` is a standalone subcommand that runs the same discovery and chunking pipeline against a local repository directory and prints a human-readable report of chunk statistics (totals, token sizes, per-extension summary) to stdout without connecting to ChromaDB, embedding, or writing to the collection. It does not require `--server-url`, `--collection-name`, or identity flags. It reports exactly the files and chunks that a normal run would insert, so it is useful for understanding or debugging how a repository will be chunked:
 
 ```bash
-chromadb-repo-indexer index \
-  --root . \
-  --organization UnitVectorY-Labs \
-  --repository example \
-  --branch main \
-  --include-extension md \
-  --chunk-report
+chromadb-repo-indexer chunk-report ~/github/example \
+  --include-extension md
 ```
+
+The report summarizes chunk counts and token sizes per file extension (files without an extension are grouped as `(none)`), largest token total first. Add `--verbose` to include the per-file breakdown:
+
+```bash
+chromadb-repo-indexer chunk-report ~/github/example --verbose
+```
+
+Add `--json` to print the machine-readable JSON report instead of formatted text; `files_detail` is only included in the JSON when `--verbose` is given:
+
+```bash
+chromadb-repo-indexer chunk-report ~/github/example --json
+```
+
+It accepts the same file and chunking flags as `index`: `--include-path`, `--exclude-path`, `--include-extension`, `--exclude-extension`, `--chunk-size`, and `--chunk-overlap`. With no path argument it reports the current directory.
 
 The last flag is deliberately separate because repository content may be sensitive. Manifests omit document text by default and contain deterministic IDs, metadata, hashes, and line boundaries.
 
