@@ -63,7 +63,7 @@ jobs:
           exit 1
       - name: Run composite Action
         id: index
-        uses: ./
+        uses: $/
         with:
           server-url: http://127.0.0.1:8765
           collection-name: ci-action-test
