@@ -63,7 +63,10 @@ jobs:
           exit 1
       - name: Run composite Action
         id: index
-        uses: $/
+        # `$/` is GitHub's self-repository syntax: it resolves to this repository at
+        # the running commit, so it cannot be repointed. Semgrep's rule predates the
+        # syntax and only exempts `./`, `docker://`, and `@<sha>`, so suppress it here.
+        uses: $/ # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag
         with:
           server-url: http://127.0.0.1:8765
           collection-name: ci-action-test
